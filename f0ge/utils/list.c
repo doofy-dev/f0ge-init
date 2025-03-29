@@ -5,6 +5,7 @@
 List *list_make() {
     List *list = allocate(sizeof(List));
     if (list != NULL) {
+        list->release_cb = NULL;
         list->head = NULL;
         list->tail = NULL;
         list->count = 0;
@@ -14,7 +15,7 @@ List *list_make() {
     return list;
 }
 
-List *list_from(size_t count, ...){
+List *list_from(size_t count, ...) {
     List *result = list_make();
     va_list ap;
     va_start(ap, count);
@@ -33,7 +34,10 @@ void list_free(List *list) {
     ListItem *start = list->head;
     while (start) {
         ListItem *next = start->next;
-        release(start->data);
+        if (list->release_cb)
+            list->release_cb(start->data);
+        else
+            release(start->data);
         release(start);
         start = next;
     }
@@ -46,7 +50,10 @@ void list_free_data(List *list) {
     ListItem *start = list->head;
     while (start) {
         ListItem *next = start->next;
-        release(start->data);
+        if (list->release_cb)
+            list->release_cb(start->data);
+        else
+            release(start->data);
         release(start);
         start = next;
     }
@@ -289,7 +296,7 @@ void *list_get_index(List *list, size_t index) {
     check_pointer(list);
     ListItem *curr = list->head;
     check_pointer(curr);
-    if(index > list->count || !curr) return NULL;
+    if (index > list->count || !curr) return NULL;
     for (size_t i = 0; i < index; i++) {
         if (!curr) return NULL;
         curr = curr->next;
@@ -297,9 +304,9 @@ void *list_get_index(List *list, size_t index) {
     return curr;
 }
 
-void *list_peek_index(List *list, size_t index){
+void *list_peek_index(List *list, size_t index) {
     ListItem *item = list_get_index(list, index);
-    if(item) return item->data;
+    if (item) return item->data;
     return NULL;
 }
 

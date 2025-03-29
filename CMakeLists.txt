@@ -55,7 +55,7 @@ define_macro_if_necessary("FURI_LOG_D")
 define_macro_if_necessary("FURI_LOG_E")
 define_macro_if_necessary("FURI_LOG_I")
 
-include_directories("${CMAKE_SOURCE_DIR}/../../")
+#include_directories("${CMAKE_SOURCE_DIR}/../../")
 # loads the source files and ads them to the project
 FILE(GLOB_RECURSE SOURCES "*.c" "*.h")
 add_executable(${PROJECT_NAME} ${SOURCES}

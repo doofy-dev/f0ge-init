@@ -7,25 +7,39 @@
 #include "utils/scheduler.h"
 #include "utils/audio.h"
 #include "graphics/asset.h"
+#include "graphics/render.h"
 
 //TODO LEAKING MEMORY somewhere
 static RuntimeData runtimeData;
 static EngineConfig engineConfig;
 
+InputType get_key_state(InputKey key) {
+    return runtimeData.inputState[key];
+}
+
+bool is_down(InputKey key) {
+    return runtimeData.inputState[key] == InputTypeLong || runtimeData.inputState[key] == InputTypePress;
+}
+
+bool is_pressed(InputKey key) {
+    return runtimeData.inputState[key] == InputTypePress;
+}
+
+bool is_up(InputKey key) {
+    return runtimeData.inputState[key] == InputTypeRelease;
+}
+
 static void gui_input_events_callback(const void *value, void *ctx) {
     RuntimeData *data = ctx;
-    furi_mutex_acquire(data->update_mutex, FuriWaitForever);
     const InputEvent *event = value;
-    FURI_LOG_D("INPUT", "GET");
-    if (event->type == InputTypeLong)
-        FURI_LOG_D("INPUT", "LONG");
-    if (event->key == InputKeyBack)
-        FURI_LOG_D("INPUT", "BACK");
 
+    if (event->type == InputTypeRepeat) return;
+
+    furi_mutex_acquire(data->update_mutex, FuriWaitForever);
     if (event->key == InputKeyBack && event->type == InputTypeLong) {
-        FURI_LOG_D("INPUT", "exiting");
         data->exit = true;
     }
+
 
     data->inputState[event->key] = event->type;
 
@@ -58,6 +72,9 @@ void init_engine(EngineConfig config) {
     tweener_prepare(&runtimeData);
     scheduler_prepare(&runtimeData);
     setup_audio(runtimeData.notification_app);
+    for (uint8_t i = 0; i < 6; i++) {
+        runtimeData.inputState[i] = InputTypeMAX;
+    }
 }
 
 void node_added(Node *node) {
@@ -70,15 +87,15 @@ void node_added(Node *node) {
     if (node->children == NULL) node->children = list_make();
     if (node->components == NULL) node->components = list_make();
 
-    if (node->render) {
+    if (node->render || node->sprite) {
         list_push_back(node, runtimeData.renderers);
     }
 
     FOREACH(n, node->components) {
         Component *c = n->data;
-        c->started = true;
-        c->node = node;
-        if (c->start) c->start(c);
+        /*c->started = true;
+        c->node = node;*/
+        if (c->start) c->start(node);
     }
 
     FOREACH(n, node->children) {
@@ -96,7 +113,7 @@ void node_removed(Node *node) {
     }
     FOREACH(n, node->components) {
         Component *c = n->data;
-        if (c->end) c->end(c);
+        if (c->end) c->end(node);
     }
     list_remove_item(node, runtimeData.renderers);
 }
@@ -109,7 +126,7 @@ void node_free(Node *node) {
 
     FOREACH(n, node->components) {
         Component *c = n->data;
-        if (c->end) c->end(c);
+        if (c->end) c->end(node);
     }
 
     list_remove_item(node, runtimeData.renderers);
@@ -146,11 +163,10 @@ void cleanup_engine() {
 Matrix temp_matrix;
 
 void update_transform(Node *node) {
-    if (true || node->transform.dirty == true) {
+    if (node->transform.dirty == true) {
         set_renderer_dirty();
         //compute from top to bottom to have a correct matrix for relative positions
         compute_transformation_matrix(&(node->transform), node->parent ? &(node->parent->transform) : NULL);
-
     }
     check_pointer(node->children);
     FOREACH(child, node->children) {
@@ -173,19 +189,19 @@ void set_scene(Node *root) {
     update_transform(root);
 }
 
+void add_component(Node *node, Component *component) {
+    list_push_back(component, node->components);
+    if (!node->active) return;
+    component->start(node);
+}
 
 void update(Node *node) {
     if (!node->active) return;
 
     FOREACH(comp, node->components) {
         Component *c = comp->data;
-        if (!c->started) {
-            c->node = node;
-            if (c->start) c->start(c);
-            c->started = true;
-        }
-
-        if (c->update) c->update(c, runtimeData.delta_time);
+        if (c->update) c->update(node, runtimeData.delta_time);
+        if (node->transform.dirty) update_transform(node);
     }
 
     FOREACH(child, node->children) {
@@ -196,9 +212,15 @@ void update(Node *node) {
 void render() {
     FOREACH(r, runtimeData.renderers) {
         Node *node = r->data;
+
+        set_transform(&(node->transform.transformation_matrix));
         if (node->render) {
-            buffer_set_transform(&(node->transform.transformation_matrix));
+            // FURI_LOG_D("-","---------------------------");
+            // Timer *t = timer_start("node render");
             node->render(node, runtimeData.renderInstance.buffer);
+            // timer_end(t);
+        }else if (node->sprite) {
+            rasterize(runtimeData.renderInstance.buffer, node->sprite);
         }
     }
 }
@@ -208,41 +230,43 @@ void set_renderer_dirty() {
 }
 
 void start_loop() {
-    uint8_t i = 0;
     furi_thread_set_current_priority(FuriThreadPriorityIdle);
-    size_t curr_frame_time = curr_time();
-    size_t last_frame_time = curr_frame_time;
+    size_t curr_frame_time = furi_get_tick();
+    size_t last_frame_time = curr_frame_time - 33;
 
     while (!runtimeData.exit) {
         if (furi_mutex_acquire(runtimeData.update_mutex, 25) != FuriStatusOk)
             continue;
-        curr_frame_time = curr_time();
+        curr_frame_time = furi_get_tick();
 
-        runtimeData.delta_time = (float) (curr_frame_time - last_frame_time) / 64000000.0f;
+        runtimeData.delta_time = (float) (curr_frame_time - last_frame_time) / 1000.f/* / 64000000.0f*/;
         last_frame_time = curr_frame_time;
+        // Timer *t = timer_start("update");
+
         update(runtimeData.root);
-        update_transform(runtimeData.root);
 
         scheduler_update();
         tweener_update();
         update_audio();
+        // timer_end(t);
 
         buffer_clear(runtimeData.renderInstance.buffer);
+        // t = timer_start("render");
         if (runtimeData.dirty) {
             render();
         }
+        // timer_end(t);
+        // FURI_LOG_D("-","---------------------------");
 
+        // t = timer_start("xbm");
         buffer_render(runtimeData.renderInstance.buffer, runtimeData.renderInstance.canvas);
+        // timer_end(t);
 
         if (engineConfig.render_ui) {
             engineConfig.render_ui(engineConfig.gameState, runtimeData.renderInstance.canvas);
         }
         canvas_commit(runtimeData.renderInstance.canvas);
 
-
-        for (i = 0; i < 6; i++) {
-            runtimeData.inputState[i] = InputTypeMAX;
-        }
 
         furi_mutex_release(runtimeData.update_mutex);
         furi_thread_yield();

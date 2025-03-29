@@ -1,87 +1,163 @@
 #include "f0ge/f0ge.h"
 #include "f0ge/utils/list.h"
 #include "rendertest_icons.h"
+#include "f0ge/components/cam_utils.h"
+#include "f0ge/graphics/asset.h"
+#include "f0ge/graphics/render.h"
 #include "f0ge/utils/helpers.h"
 
-typedef struct {
-    int a;
-    int b;
-} ASD;
+bool left = false;
+uint8_t id = 0;
 
-Buffer *image;
-
-void render_node(Node *self, Buffer *buffer) {
-    UNUSED(self);
-    Vector pos = {0, 0};
-    buffer_draw_all(buffer, image, &pos);
-}
-
-void comp_start(Component *self) {
-    UNUSED(self);
-}
+static RenderData car_render, brick_render;
 
 float direction = 1;
+float posx = 0;
+float velocity = -9.f;
+bool canjump = true;
+const float half_screen = (SCREEN_WIDTH / 2.f);
+float lastChange = 0;
+Vector momentum = VECTOR_ZERO;
+float speed = 0;
+float MAX_SPEED = 100.f;
+float ACC = 0.3f;
+Vector prevCenter = {64, 32};
 
-void comp_upd(Component *self, float delta) {
-    self->node->transform.rotation += 40.0f * delta;
-    self->node->transform.scale.x += direction / 2 * delta;
-    if (self->node->transform.scale.x > 2) direction = -1;
-    if (self->node->transform.scale.x < 0.01) direction = 1;
-    if (self->node->transform.rotation > 360) self->node->transform.rotation = 0;
-    self->node->transform.dirty = true;
-}
+float smoothing_factor = 0.1f; // Controls smoothing (0 = no movement, 1 = instant movement)
 
-void comp2_upd(Component *self, float delta) {
-    self->node->transform.rotation += 40.0f * delta;
-    if (self->node->transform.rotation > 360) self->node->transform.rotation = 0;
-    self->node->transform.dirty = true;
-}
+void car_upd(Node *self, float delta) {
+    Vector forward;
+    matrix_forward(&(self->transform.transformation_matrix), &forward);
 
-void comp_end(Component *self) {
-    UNUSED(self);
+
+    //reduce speed on other axes
+
+    vector_normalized(&forward, &forward);
+
+    if (is_down(InputKeyUp)) {
+        if (speed < -1) speed /= 3;
+        else {
+            speed += (MAX_SPEED * ACC) * delta;
+        }
+    } else if (is_down(InputKeyDown)) {
+        if (speed > 1) {
+            speed /= 2;
+        } else
+            speed -= (MAX_SPEED * ACC) * delta;
+    } else {
+        speed *= 0.8f;
+    }
+
+
+    if (speed > MAX_SPEED) {
+        speed = MAX_SPEED;
+    }
+    if (speed < -MAX_SPEED) {
+        speed = -MAX_SPEED;
+    }
+
+    // if (is_down(InputKeyUp) || is_down(InputKeyDown)) {
+    momentum.x = speed * delta * forward.y;
+    momentum.y = speed * delta * -forward.x;
+    // }
+
+    float l = MIN(vector_length_sqrt(&momentum), 10);
+
+    if (speed != 0) {
+        int8_t sign = 1;
+        if (speed < 0) sign = -1;
+        if (is_down(InputKeyLeft)) sign *= -1;
+
+        if (is_down(InputKeyLeft) || is_down(InputKeyRight)) {
+            self->transform.rotation += sign * delta * 10.f * l;
+        }
+    }
+
+    vector_add(&(self->transform.position), &momentum, &(self->transform.position));
+
+
+    vector_normalized(&momentum, &forward);
+    forward.x *= l * -6.4f;
+    forward.y *= l * -3.2f;
+    Vector center = {64 + forward.x, 32 + forward.y};
+    vector_lerp(&prevCenter, &center, 0.2f, &center);
+    cam_shift(center);
+    prevCenter = center;
+
+    self->transform.dirty = true;
 }
 
 int main() {
-    image = buffer_decompress_icon(&I_extra_ball);
+    car_render = (RenderData){
+        .poly = RECTANGLE(-12, -18, 12, 18),
+        .tile_mode = TILE_NONE,
+        .color = Black,
+        .mask_color = White,
+        .sprite = asset_get_icon(&I_car),
+        .mask = asset_get_icon(&I_car_fill)
+    };
+
+    brick_render = (RenderData){
+        .color = Black,
+        .poly = RECTANGLE(0, 0, 16, 16),
+        .mask = NULL,
+        .tile_mode = TILE_BOTH,
+        .sprite = asset_get_icon(&I_block)
+    };
+
+
+    cam_follow_set_directions(FollowLeft | FollowRight | FollowUp | FollowDown);
+    cam_follow_set_area(10, 10, 5, 5);
 
     Component maincomp = {
-        .start = &comp_start,
-        .update = &comp_upd,
-        .end = &comp_end,
+        .start = NULL,
+        .update = &car_upd,
+        .end = NULL,
     };
-    Component maincomp2 = {
-        .start = &comp_start,
-        .update = &comp2_upd,
-        .end = &comp_end,
-    };
-    Node child = {
+
+    Node player = {
         .transform = {
-            .position = {50, 0},
-            .rotation = 0,
+            .position = {64, 34},
+            .rotation = 45,
             .scale = {1, 1}
         },
         .children = NULL,
-        .components = list_from(1, &maincomp),
-        .render = &render_node,
+        .components = list_from(2, &maincomp, &com_camera_follow),
+        .render = NULL,
+        .sprite = &car_render,
     };
+    Node brick = {
+        .transform = {
+            .position = {0, 60},
+            .rotation = 0,
+            .scale = {10, 10}
+        },
+        .children = NULL,
+        .components = NULL,
+        .sprite = &brick_render,
+        .render = NULL,
+    };
+
     Node root = {
         .transform = {
-            .position = {64, 32},
+            .position = {0, 0},
             .rotation = 0,
-            .scale = {0.5f, 0.5f}
+            .scale = {1, 1}
         },
-        .children = list_from(1, &child),
-        .components = list_from(1, &maincomp2),
-        .render = &render_node,
+        .children = list_from(2, &brick, &player),
+        .components = NULL,
+        .sprite = NULL,
+        .render = NULL,
     };
 
     init_engine((EngineConfig){
         .muted = false,
-        .backlight = true
+        .backlight = true,
+        .render_ui = NULL
     });
+
     set_scene(&root);
     start_loop();
-    buffer_release(image);
 }
 
 int32_t render_app(void *p) {

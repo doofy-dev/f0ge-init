@@ -6,17 +6,17 @@
 typedef struct List List;
 typedef struct ListItem ListItem;
 
-//TODO maybe add a release callback to make the data release configurable
 struct ListItem {
     void *data;
-    struct ListItem *next;
-    struct ListItem *prev;
+    ListItem *next;
+    ListItem *prev;
 };
 
 struct List{
     ListItem *head;
     ListItem *tail;
     size_t count;
+    void (*release_cb)(void *data);
 };
 
 List *list_make();

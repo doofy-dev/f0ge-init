@@ -20,3 +20,10 @@ void node_removed(Node *node);
 void node_free(Node *node);
 
 void change_ui_renderer(void (*render_ui)(void *gameState, Canvas *canvas));
+
+InputType get_key_state(InputKey key);
+bool is_down(InputKey key);
+bool is_pressed(InputKey key);
+bool is_up(InputKey key);
+
+void add_component(Node *node, Component *component);

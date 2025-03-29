@@ -4,9 +4,7 @@ typedef struct Component Component;
 typedef struct Node Node;
 
 struct Component{
-    Node *node;
-    bool started;
-    void (*start)(Component *self);
-    void (*update)(Component *self, float delta);
-    void (*end)(Component *self);
+    void (*start)(Node *self);
+    void (*update)(Node *self, float delta);
+    void (*end)(Node *self);
 };

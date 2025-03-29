@@ -128,3 +128,8 @@ void matrix_print(Matrix *a) {
                (double)(*a)[i*3+2]
     );
 }
+
+void matrix_forward(Matrix *a, Vector *target) {
+    target->x = (*a)[0];
+    target->y = (*a)[3];
+}

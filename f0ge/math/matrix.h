@@ -31,6 +31,7 @@ void matrix_get_translation(Matrix *a, Vector *translation);
 
 float matrix_get_rotation(Matrix *a);
 void matrix_get_scaling(Matrix *a, Vector *target);
+void matrix_forward(Matrix *a, Vector *target);
 
 void compute_transformation_matrix(Transform* target, Transform *parent);
 

@@ -13,6 +13,10 @@
 #define release(X) {_release(X);X=NULL;}
 #endif
 
+typedef struct {
+  const char* name;
+  uint32_t start;
+} Timer;
 
 char *get_basename(const char *path);
 
@@ -35,3 +39,6 @@ void _release_debug(void *p, const char *file, int line, const char *func);
 void _release(void *p);
 
 void check_leak();
+
+Timer* timer_start(const char*name);
+size_t timer_end(Timer *t);

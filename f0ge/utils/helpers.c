@@ -56,3 +56,26 @@ void check_leak(){
         FURI_LOG_E("Memory", "Leak detected, pointers left in memory: %d", pointer_count);
     }
 }
+
+Timer* timer_start(const char*name) {
+    Timer *t = malloc(sizeof(Timer));
+    t->name = name;
+    t->start = DWT->CYCCNT;
+    return t;
+}
+
+const char *format[3] = {"us", "ms", "s"};
+size_t timer_end(Timer *t) {
+    int8_t i = 0;
+    uint32_t start = t->start;
+    uint32_t diff = (DWT->CYCCNT - start);
+    double d = (double)diff/ (double)64.0;
+    while (d >= (double)1000.0) {
+        d /= (double)1000.0;
+        i++;
+        if (i >= 3) break;
+    }
+    FURI_LOG_D("Timer", "%s: %f %s", t->name, d, format[i]);
+    free(t);
+    return diff;
+}
