@@ -4,33 +4,17 @@
 #include "f0ge/components/cam_utils.h"
 #include "f0ge/graphics/asset.h"
 #include "f0ge/graphics/render.h"
-#include "f0ge/utils/helpers.h"
 
-bool left = false;
-uint8_t id = 0;
-
-static RenderData car_render, brick_render;
-
-float direction = 1;
-float posx = 0;
-float velocity = -9.f;
-bool canjump = true;
-const float half_screen = (SCREEN_WIDTH / 2.f);
-float lastChange = 0;
 Vector momentum = VECTOR_ZERO;
 float speed = 0;
 float MAX_SPEED = 100.f;
 float ACC = 0.3f;
 Vector prevCenter = {64, 32};
 
-float smoothing_factor = 0.1f; // Controls smoothing (0 = no movement, 1 = instant movement)
 
 void car_upd(Node *self, float delta) {
     Vector forward;
     matrix_forward(&(self->transform.transformation_matrix), &forward);
-
-
-    //reduce speed on other axes
 
     vector_normalized(&forward, &forward);
 
@@ -56,10 +40,8 @@ void car_upd(Node *self, float delta) {
         speed = -MAX_SPEED;
     }
 
-    // if (is_down(InputKeyUp) || is_down(InputKeyDown)) {
     momentum.x = speed * delta * forward.y;
     momentum.y = speed * delta * -forward.x;
-    // }
 
     float l = MIN(vector_length_sqrt(&momentum), 10);
 
@@ -81,14 +63,18 @@ void car_upd(Node *self, float delta) {
     forward.y *= l * -3.2f;
     Vector center = {64 + forward.x, 32 + forward.y};
     vector_lerp(&prevCenter, &center, 0.2f, &center);
+
+    //move the camera follower component's center to be able to see ahead
     cam_shift(center);
+
     prevCenter = center;
 
     self->transform.dirty = true;
 }
 
 int main() {
-    car_render = (RenderData){
+    //Set up the renderer for the sprites them
+    RenderData car_render = (RenderData){
         .poly = RECTANGLE(-12, -18, 12, 18),
         .tile_mode = TILE_NONE,
         .color = Black,
@@ -97,7 +83,7 @@ int main() {
         .mask = asset_get_icon(&I_car_fill)
     };
 
-    brick_render = (RenderData){
+    RenderData brick_render = (RenderData){
         .color = Black,
         .poly = RECTANGLE(0, 0, 16, 16),
         .mask = NULL,
@@ -105,16 +91,18 @@ int main() {
         .sprite = asset_get_icon(&I_block)
     };
 
-
+    //Set up the player follower camera
     cam_follow_set_directions(FollowLeft | FollowRight | FollowUp | FollowDown);
     cam_follow_set_area(10, 10, 5, 5);
 
+    //Create a new component for the driving
     Component maincomp = {
         .start = NULL,
         .update = &car_upd,
         .end = NULL,
     };
 
+    //Set up the car node
     Node player = {
         .transform = {
             .position = {64, 34},
@@ -126,6 +114,8 @@ int main() {
         .render = NULL,
         .sprite = &car_render,
     };
+
+    //Set up the brick node
     Node brick = {
         .transform = {
             .position = {0, 60},
@@ -138,6 +128,7 @@ int main() {
         .render = NULL,
     };
 
+    //Set up the root node that holds all together
     Node root = {
         .transform = {
             .position = {0, 0},
@@ -150,12 +141,14 @@ int main() {
         .render = NULL,
     };
 
+    //Start the engine
     init_engine((EngineConfig){
         .muted = false,
         .backlight = true,
         .render_ui = NULL
     });
 
+    //Set the scene to render
     set_scene(&root);
     start_loop();
 }
