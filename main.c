@@ -11,7 +11,6 @@ float MAX_SPEED = 100.f;
 float ACC = 0.3f;
 Vector prevCenter = {64, 32};
 
-
 void car_upd(Node *self, float delta) {
     Vector forward;
     matrix_forward(&(self->transform.transformation_matrix), &forward);
@@ -72,19 +71,38 @@ void car_upd(Node *self, float delta) {
     self->transform.dirty = true;
 }
 
+/*
+void render_circle(Buffer *screen, RenderData *data, Vector *scaling, Vector *pixel, Vector *uv) {
+    UNUSED(data);
+    UNUSED(scaling);
+
+    Vector center = {0.5f, 0.5f};
+
+    if (vector_distance(uv, &center) < 0.5f) {
+        set_pixel(screen, pixel);
+    }
+}
+
+static RenderData car_render = (RenderData){
+    .poly = RECTANGLE(-12, -18, 12, 18),
+    .tile_mode = TILE_NONE,
+    .color = COLOR_BLACK,
+    .callback = &render_circle
+};*/
+
 int main() {
     //Set up the renderer for the sprites them
     RenderData car_render = (RenderData){
         .poly = RECTANGLE(-12, -18, 12, 18),
         .tile_mode = TILE_NONE,
-        .color = Black,
-        .mask_color = White,
+        .color = COLOR_BLACK,
+        .mask_color = COLOR_WHITE,
         .sprite = asset_get_icon(&I_car),
-        .mask = asset_get_icon(&I_car_fill)
+        .mask = asset_get_icon(&I_car_fill),
     };
 
     RenderData brick_render = (RenderData){
-        .color = Black,
+        .color = COLOR_BLACK,
         .poly = RECTANGLE(0, 0, 16, 16),
         .mask = NULL,
         .tile_mode = TILE_BOTH,
@@ -144,6 +162,7 @@ int main() {
     //Start the engine
     init_engine((EngineConfig){
         .muted = false,
+        .render_fps = 30,
         .backlight = true,
         .render_ui = NULL
     });

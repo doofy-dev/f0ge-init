@@ -60,13 +60,13 @@ void buffer_set_pixel(Buffer *buffer, int16_t x, int16_t y, PixelColor color) {
     uint8_t *p = &(buffer->data[pixel(x, y, buffer->width)]);
 
     switch (color) {
-        case Black:
+        case COLOR_BLACK:
             *p |= bit;
             break;
-        case White:
+        case COLOR_WHITE:
             *p &= ~bit;
             break;
-        case Flip:
+        case COLOR_FLIP:
             *p ^= bit;
             break;
         default:

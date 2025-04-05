@@ -17,6 +17,8 @@ typedef struct {
 struct EngineConfig{
     bool muted;
     bool backlight;
+    uint8_t physics_fps;
+    uint8_t render_fps;
     uint8_t volume;
     void *gameState;
     void (*render_ui)(void *gameState, Canvas *canvas);

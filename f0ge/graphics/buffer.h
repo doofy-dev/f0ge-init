@@ -17,10 +17,10 @@ struct Buffer {
 };
 
 typedef enum  {
-    Black, //or
-    White, //
-    Flip, //not
-    Set
+    COLOR_BLACK, //or
+    COLOR_WHITE, //
+    COLOR_FLIP, //not
+    COLOR_SET
 } PixelColor;
 
 #define SCREEN_WIDTH 128

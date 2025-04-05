@@ -5,7 +5,7 @@
 #include "../math/equation.h"
 #include "../utils/helpers.h"
 
-static PixelColor render_color = Black;
+static PixelColor render_color = COLOR_BLACK;
 static Matrix *current_transform;
 static Matrix identity_transform = IDENTITY_MATRIX;
 static Vector camera_position = {0, 0};

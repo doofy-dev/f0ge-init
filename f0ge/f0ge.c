@@ -219,7 +219,7 @@ void render() {
             // Timer *t = timer_start("node render");
             node->render(node, runtimeData.renderInstance.buffer);
             // timer_end(t);
-        }else if (node->sprite) {
+        } else if (node->sprite) {
             rasterize(runtimeData.renderInstance.buffer, node->sprite);
         }
     }
@@ -232,32 +232,43 @@ void set_renderer_dirty() {
 void start_loop() {
     furi_thread_set_current_priority(FuriThreadPriorityIdle);
     size_t curr_frame_time = furi_get_tick();
-    size_t last_frame_time = curr_frame_time - 33;
+    //Failsafe, if 0, set it to a reasonable fps
+    if (engineConfig.render_fps == 0) engineConfig.render_fps = 20;
+
+    const uint32_t FPS = 1000 / engineConfig.render_fps;
+    size_t last_frame_time = curr_frame_time - FPS;
+    size_t delta = 0;
 
     while (!runtimeData.exit) {
         if (furi_mutex_acquire(runtimeData.update_mutex, 25) != FuriStatusOk)
             continue;
-        curr_frame_time = furi_get_tick();
 
-        runtimeData.delta_time = (float) (curr_frame_time - last_frame_time) / 1000.f/* / 64000000.0f*/;
-        last_frame_time = curr_frame_time;
+        curr_frame_time = furi_get_tick();
+        delta = curr_frame_time - last_frame_time;
         // Timer *t = timer_start("update");
 
-        update(runtimeData.root);
+        //Skip processing if delta is below the set update rate
+        if (delta >= FPS) {
+            runtimeData.delta_time = (float) (delta) / 1000.f/* / 64000000.0f*/;
+            last_frame_time = curr_frame_time;
 
-        scheduler_update();
-        tweener_update();
-        update_audio();
-        // timer_end(t);
+            update(runtimeData.root);
 
-        buffer_clear(runtimeData.renderInstance.buffer);
-        // t = timer_start("render");
-        if (runtimeData.dirty) {
-            render();
+            scheduler_update();
+            tweener_update();
+            update_audio();
+
+            buffer_clear(runtimeData.renderInstance.buffer);
+            // t = timer_start("render");
+            if (runtimeData.dirty) {
+                render();
+            }
         }
+
         // timer_end(t);
         // FURI_LOG_D("-","---------------------------");
 
+        // Draw the back buffer and UI
         // t = timer_start("xbm");
         buffer_render(runtimeData.renderInstance.buffer, runtimeData.renderInstance.canvas);
         // timer_end(t);
@@ -265,6 +276,7 @@ void start_loop() {
         if (engineConfig.render_ui) {
             engineConfig.render_ui(engineConfig.gameState, runtimeData.renderInstance.canvas);
         }
+
         canvas_commit(runtimeData.renderInstance.canvas);
 
 
