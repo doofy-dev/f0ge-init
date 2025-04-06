@@ -4,6 +4,7 @@
 #include "utils/list.h"
 #include "graphics/buffer.h"
 typedef struct RenderData RenderData;
+typedef struct RenderingData RenderingData;
 typedef struct Node Node;
 
 #define MAKE_NODE() (Node){ \
@@ -13,7 +14,7 @@ typedef struct Node Node;
     .children=NULL, \
     .components=NULL, \
     .sprite=NULL, \
-    .render=NULL \
+    .render_callback=NULL \
 }
 
 struct Node {
@@ -24,5 +25,7 @@ struct Node {
     List *components;
     RenderData *sprite;
 
-    void (*render)(Node *self, Buffer *buffer);
+    RenderingData *_rendering_data; //reference to engine cache
+
+    void (*render_callback)(Node *self, Buffer *buffer);
 };

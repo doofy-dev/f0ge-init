@@ -82,35 +82,6 @@ void render_filled(Buffer *screen, RenderData *data, Vector *scaling, Vector *pi
     buffer_set_pixel(screen, pixel->x, pixel->y, render_color);
 }
 
-void draw_rect(Buffer *buffer, Rect rect) {
-    RenderData r = (RenderData){
-        .poly = RECTANGLE(rect.x, rect.y, rect.width, rect.height),
-        .callback = &render_filled
-    };
-
-    rasterize(buffer, &r);
-}
-
-void draw_rect_frame(Buffer *buffer, Rect rect) {
-    rect.x -= camera_position.x;
-    rect.y -= camera_position.x;
-
-    Vector tmp, tmp2, pos = {.x = rect.x, .y = rect.y};
-    tmp2.x = rect.x;
-    tmp2.y = rect.y + rect.height;
-    draw_line(buffer, &pos, &tmp2);
-
-    tmp.x = rect.x + rect.width;
-    tmp.y = rect.y + rect.height;
-    draw_line(buffer, &pos, &tmp);
-
-    draw_line(buffer, &tmp2, &tmp);
-
-    tmp2.x = rect.x + rect.width;
-    tmp2.y = rect.y;
-    draw_line(buffer, &tmp2, &tmp);
-}
-
 void flip_uv(Poly *poly, FlipMode flip_mode) {
     if (flip_mode) {
         for (uint8_t i = 0; i < 4; ++i) {
@@ -193,7 +164,7 @@ void rasterize_triangle(Buffer *buffer, RenderData *data, Vector *scaling,
     }
 }
 
-void rasterize(Buffer *buffer, RenderData *data) {
+void rasterize(Buffer *buffer, RenderData *data, Vector cachedCorner[4]) {
     if (!buffer) return;
     // Timer *timer = timer_start("rasterize start");
 
@@ -204,7 +175,6 @@ void rasterize(Buffer *buffer, RenderData *data) {
 
     // timer = timer_start("cull");
 
-    Vector tmp;
     Vector corner[4];
 
     float x_min = FLT_MAX, x_max = -FLT_MAX, y_min = FLT_MAX, y_max = -FLT_MAX;
@@ -215,8 +185,10 @@ void rasterize(Buffer *buffer, RenderData *data) {
 
     // frustum cull
     for (int i = 0; i < 4; i++) {
-        matrix_mul_vector(current_transform, &(data->poly.corners[i]), &tmp);
-        corner[i] = (Vector){tmp.x - camera_position.x, tmp.y - camera_position.y};
+        // matrix_mul_vector(current_transform, &(data->poly.corners[i]), &(cachedCorner[i]));
+
+
+        corner[i] = (Vector){cachedCorner[i].x - camera_position.x, cachedCorner[i].y - camera_position.y};
         x_min = MIN(corner[i].x, corner[(i + 1) % 4].x);
         x_max = MAX(corner[i].x, corner[(i + 1) % 4].x);
         y_min = MIN(corner[i].y, corner[(i + 1) % 4].y);

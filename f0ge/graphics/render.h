@@ -40,7 +40,6 @@ struct RenderData {
     PixelColor color;
     PixelColor mask_color;
     TileMode tile_mode;
-    uint8_t cachedUv;
 
     void (*callback)(Buffer *screen, RenderData *data, Vector *scaling, Vector *pixel, Vector *uv);
 };
@@ -59,12 +58,8 @@ void set_pixel(Buffer *buffer, Vector *screen);
 
 void set_color(PixelColor color);
 
-void rasterize(Buffer *buffer, RenderData *data);
+void rasterize(Buffer *buffer, RenderData *data, Vector cachedCorner[4]);
 
 void draw_line(Buffer *buffer, Vector *a, Vector *b);
-
-void draw_rect(Buffer *buffer, Rect rect);
-
-void draw_rect_frame(Buffer *buffer, Rect rect);
 
 void flip_uv(Poly *poly, FlipMode flip_mode);

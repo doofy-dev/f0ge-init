@@ -13,6 +13,21 @@
 static RuntimeData runtimeData;
 static EngineConfig engineConfig;
 
+struct RenderingData {
+    Node *node;
+    Vector cachedCorners[4];
+};
+
+RenderingData *make_rendering_data(Node *node) {
+    RenderingData *data = allocate(sizeof(RenderingData));
+    data->node = node;
+    for (int i = 0; i < 4; i++) {
+        data->cachedCorners[i] = node->sprite->poly.corners[i];
+    }
+    node->_rendering_data = data;
+    return data;
+}
+
 InputType get_key_state(InputKey key) {
     return runtimeData.inputState[key];
 }
@@ -87,8 +102,11 @@ void node_added(Node *node) {
     if (node->children == NULL) node->children = list_make();
     if (node->components == NULL) node->components = list_make();
 
-    if (node->render || node->sprite) {
-        list_push_back(node, runtimeData.renderers);
+    if (node->render_callback || node->sprite) {
+        list_push_back(
+            make_rendering_data(node),
+            runtimeData.renderers
+        );
     }
 
     FOREACH(n, node->components) {
@@ -107,6 +125,7 @@ void node_added(Node *node) {
 
 void node_removed(Node *node) {
     if (!node) return;
+    node->_rendering_data = NULL;
     set_renderer_dirty();
     FOREACH(n, node->children) {
         node_removed(n->data);
@@ -115,7 +134,17 @@ void node_removed(Node *node) {
         Component *c = n->data;
         if (c->end) c->end(node, c->data);
     }
-    list_remove_item(node, runtimeData.renderers);
+
+    //remove renderer if had one
+    if (node->sprite) {
+        FOREACH(n, runtimeData.renderers) {
+            if (n->data == node) {
+                list_remove_item(n, runtimeData.renderers);
+                release(n);
+                break;
+            }
+        }
+    }
 }
 
 void node_free(Node *node) {
@@ -123,13 +152,24 @@ void node_free(Node *node) {
     FOREACH(n, node->children) {
         node_free(n->data);
     }
+    node->_rendering_data = NULL;
 
     FOREACH(n, node->components) {
         Component *c = n->data;
         if (c->end) c->end(node, c->data);
     }
 
-    list_remove_item(node, runtimeData.renderers);
+    //remove renderer if had one
+    if (node->sprite) {
+        FOREACH(n, runtimeData.renderers) {
+            if (n->data == node) {
+                list_remove_item(n, runtimeData.renderers);
+                release(n);
+                break;
+            }
+        }
+    }
+
     list_clear(node->components);
     list_clear(node->children);
 
@@ -140,7 +180,7 @@ void cleanup_engine() {
     node_free(runtimeData.root);
     tweener_cleanup();
     scheduler_cleanup();
-    list_clear(runtimeData.renderers);
+    list_free_data(runtimeData.renderers);
     release(runtimeData.renderers);
 
     asset_cleanup();
@@ -167,7 +207,17 @@ void update_transform(Node *node) {
         set_renderer_dirty();
         //compute from top to bottom to have a correct matrix for relative positions
         compute_transformation_matrix(&(node->transform), node->parent ? &(node->parent->transform) : NULL);
+
+
+        if (node->sprite) {
+            for (int i = 0; i < 4; i++) {
+                matrix_mul_vector(&(node->transform.transformation_matrix), &(node->sprite->poly.corners[i]),
+                                  &(node->_rendering_data->cachedCorners[i]));
+            }
+        }
     }
+
+
     check_pointer(node->children);
     FOREACH(child, node->children) {
         check_pointer(child);
@@ -222,16 +272,16 @@ void update(Node *node) {
 
 void render() {
     FOREACH(r, runtimeData.renderers) {
-        Node *node = r->data;
+        RenderingData *rd = r->data;
 
-        set_transform(&(node->transform.transformation_matrix));
-        if (node->render) {
+        set_transform(&(rd->node->transform.transformation_matrix));
+        if (rd->node->render_callback) {
             // FURI_LOG_D("-","---------------------------");
             // Timer *t = timer_start("node render");
-            node->render(node, runtimeData.renderInstance.buffer);
+            rd->node->render_callback(rd->node, runtimeData.renderInstance.buffer);
             // timer_end(t);
-        } else if (node->sprite) {
-            rasterize(runtimeData.renderInstance.buffer, node->sprite);
+        } else if (rd->node->sprite) {
+            rasterize(runtimeData.renderInstance.buffer, rd->node->sprite, rd->cachedCorners);
         }
     }
 }
