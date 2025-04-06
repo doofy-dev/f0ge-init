@@ -27,3 +27,4 @@ bool is_pressed(InputKey key);
 bool is_up(InputKey key);
 
 void add_component(Node *node, Component *component);
+void add_child(Node *parent, Node *child);

@@ -1,52 +1,54 @@
 #include "f0ge/f0ge.h"
-#include "f0ge/utils/list.h"
 #include "rendertest_icons.h"
 #include "f0ge/components/cam_utils.h"
 #include "f0ge/graphics/asset.h"
 #include "f0ge/graphics/render.h"
 
-Vector momentum = VECTOR_ZERO;
-float speed = 0;
-float MAX_SPEED = 100.f;
-float ACC = 0.3f;
-Vector prevCenter = {64, 32};
+typedef struct {
+    Vector momentum;
+    float speed;
+    float MAX_SPEED;
+    float ACC;
+    Vector prevCenter;
+} CarData;
 
-void car_upd(Node *self, float delta) {
+void car_upd(Node *self, float delta, void *data) {
+    CarData *car = (CarData *) data;
     Vector forward;
     matrix_forward(&(self->transform.transformation_matrix), &forward);
 
     vector_normalized(&forward, &forward);
 
     if (is_down(InputKeyUp)) {
-        if (speed < -1) speed /= 3;
+        if (car->speed < -1) car->speed /= 3;
         else {
-            speed += (MAX_SPEED * ACC) * delta;
+            car->speed += (car->MAX_SPEED * car->ACC) * delta;
         }
     } else if (is_down(InputKeyDown)) {
-        if (speed > 1) {
-            speed /= 2;
+        if (car->speed > 1) {
+            car->speed /= 2;
         } else
-            speed -= (MAX_SPEED * ACC) * delta;
+            car->speed -= (car->MAX_SPEED * car->ACC) * delta;
     } else {
-        speed *= 0.8f;
+        car->speed *= 0.8f;
     }
 
 
-    if (speed > MAX_SPEED) {
-        speed = MAX_SPEED;
+    if (car->speed > car->MAX_SPEED) {
+        car->speed = car->MAX_SPEED;
     }
-    if (speed < -MAX_SPEED) {
-        speed = -MAX_SPEED;
+    if (car->speed < -car->MAX_SPEED) {
+        car->speed = -car->MAX_SPEED;
     }
 
-    momentum.x = speed * delta * forward.y;
-    momentum.y = speed * delta * -forward.x;
+    car->momentum.x = car->speed * delta * forward.y;
+    car->momentum.y = car->speed * delta * -forward.x;
 
-    float l = MIN(vector_length_sqrt(&momentum), 10);
+    float l = MIN(vector_length_sqrt(&(car->momentum)), 10);
 
-    if (speed != 0) {
+    if (car->speed != 0) {
         int8_t sign = 1;
-        if (speed < 0) sign = -1;
+        if (car->speed < 0) sign = -1;
         if (is_down(InputKeyLeft)) sign *= -1;
 
         if (is_down(InputKeyLeft) || is_down(InputKeyRight)) {
@@ -54,41 +56,22 @@ void car_upd(Node *self, float delta) {
         }
     }
 
-    vector_add(&(self->transform.position), &momentum, &(self->transform.position));
+    vector_add(&(self->transform.position), &(car->momentum), &(self->transform.position));
 
 
-    vector_normalized(&momentum, &forward);
+    vector_normalized(&(car->momentum), &forward);
     forward.x *= l * -6.4f;
     forward.y *= l * -3.2f;
     Vector center = {64 + forward.x, 32 + forward.y};
-    vector_lerp(&prevCenter, &center, 0.2f, &center);
+    vector_lerp(&(car->prevCenter), &center, 0.2f, &center);
 
     //move the camera follower component's center to be able to see ahead
     cam_shift(center);
 
-    prevCenter = center;
+    (car->prevCenter) = center;
 
     self->transform.dirty = true;
 }
-
-/*
-void render_circle(Buffer *screen, RenderData *data, Vector *scaling, Vector *pixel, Vector *uv) {
-    UNUSED(data);
-    UNUSED(scaling);
-
-    Vector center = {0.5f, 0.5f};
-
-    if (vector_distance(uv, &center) < 0.5f) {
-        set_pixel(screen, pixel);
-    }
-}
-
-static RenderData car_render = (RenderData){
-    .poly = RECTANGLE(-12, -18, 12, 18),
-    .tile_mode = TILE_NONE,
-    .color = COLOR_BLACK,
-    .callback = &render_circle
-};*/
 
 int main() {
     //Set up the renderer for the sprites them
@@ -113,51 +96,59 @@ int main() {
     cam_follow_set_directions(FollowLeft | FollowRight | FollowUp | FollowDown);
     cam_follow_set_area(10, 10, 5, 5);
 
+    CarData car_data = {
+        .MAX_SPEED = 100,
+        .momentum = VECTOR_ZERO,
+        .speed = 0,
+        .ACC = 0.3f,
+        .prevCenter = {64, 32}
+    };
     //Create a new component for the driving
-    Component maincomp = {
-        .start = NULL,
-        .update = &car_upd,
-        .end = NULL,
-    };
+    Component maincomp = MAKE_COMPONENT();
+    maincomp.update = &car_upd;
+    maincomp.data = &car_data;
 
-    //Set up the car node
-    Node player = {
-        .transform = {
-            .position = {64, 34},
-            .rotation = 45,
-            .scale = {1, 1}
-        },
-        .children = NULL,
-        .components = list_from(2, &maincomp, &com_camera_follow),
-        .render = NULL,
-        .sprite = &car_render,
+    CarData car2_data = {
+        .MAX_SPEED = 100,
+        .momentum = VECTOR_ZERO,
+        .speed = 0,
+        .ACC = 0.5f,
+        .prevCenter = {64, 32}
     };
+    //Create a new component for the driving
+    Component maincomp2 = MAKE_COMPONENT();
+    maincomp2.update = &car_upd;
+    maincomp2.data = &car2_data;
+
+    //---------------------------------------------------------------------------------------------
+    //Set up the car node
+    Node player = MAKE_NODE();
+    player.sprite = &car_render;
+    add_component(&player, &maincomp);
+    add_component(&player, &com_camera_follow);
+    player.transform.position = (Vector){64, 34};
+    // player.transform.scale = (Vector){2.5f, 2.5f};
+
+    Node player2 = MAKE_NODE();
+    player2.sprite = &car_render;
+    add_component(&player2, &maincomp2);
+    player2.transform.position = (Vector){32, 34};
+    // player2.transform.scale = (Vector){2.5f, 2.5f};
+
 
     //Set up the brick node
-    Node brick = {
-        .transform = {
-            .position = {0, 60},
-            .rotation = 0,
-            .scale = {10, 10}
-        },
-        .children = NULL,
-        .components = NULL,
-        .sprite = &brick_render,
-        .render = NULL,
-    };
+    Node brick = MAKE_NODE();
+    brick.sprite = &brick_render;
+    brick.transform.position = (Vector){0, 60};
+    brick.transform.scale = (Vector){10, 10};
+
 
     //Set up the root node that holds all together
-    Node root = {
-        .transform = {
-            .position = {0, 0},
-            .rotation = 0,
-            .scale = {1, 1}
-        },
-        .children = list_from(2, &brick, &player),
-        .components = NULL,
-        .sprite = NULL,
-        .render = NULL,
-    };
+    Node root = MAKE_NODE();
+    add_child(&root, &brick);
+    add_child(&root, &player);
+    add_child(&root, &player2);
+
 
     //Start the engine
     init_engine((EngineConfig){

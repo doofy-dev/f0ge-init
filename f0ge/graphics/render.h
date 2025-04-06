@@ -33,7 +33,6 @@ typedef struct {
 .uv = {{0, 0},{1, 0},{1, 1},{0, 1}}\
 }
 
-
 struct RenderData {
     Poly poly;
     Buffer *sprite;

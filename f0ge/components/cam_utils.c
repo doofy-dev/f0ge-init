@@ -3,7 +3,7 @@
 #include "../graphics/render.h"
 #include "../component.h"
 
-void cam_follow_update(Node *self, float delta);
+void cam_follow_update(Node *self, float delta, void *data);
 
 static uint8_t follow_directions = FollowNone;
 static uint8_t edge_left = 0, edge_right = 0, edge_up = 0, edge_down = 0;
@@ -14,8 +14,9 @@ Component com_camera_follow = {
     .update = &cam_follow_update,
 };
 
-void cam_follow_update(Node *self, float delta) {
+void cam_follow_update(Node *self, float delta, void *data) {
     UNUSED(delta);
+    UNUSED(data);
 
     if (follow_directions == FollowNone) return;
 

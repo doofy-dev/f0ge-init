@@ -62,6 +62,8 @@ void render_uv(Buffer *screen, RenderData *data, Vector *scaling, Vector *pixel,
 
         uv->x = u;
         uv->y = v;
+    } else if (uv->x < 0 || uv->x > 1 || uv->y < 0 || uv->y > 1) {
+        return;
     }
 
     // Sample the texture and render the pixel

@@ -95,7 +95,7 @@ void node_added(Node *node) {
         Component *c = n->data;
         /*c->started = true;
         c->node = node;*/
-        if (c->start) c->start(node);
+        if (c->start) c->start(node, c->data);
     }
 
     FOREACH(n, node->children) {
@@ -113,7 +113,7 @@ void node_removed(Node *node) {
     }
     FOREACH(n, node->components) {
         Component *c = n->data;
-        if (c->end) c->end(node);
+        if (c->end) c->end(node, c->data);
     }
     list_remove_item(node, runtimeData.renderers);
 }
@@ -126,7 +126,7 @@ void node_free(Node *node) {
 
     FOREACH(n, node->components) {
         Component *c = n->data;
-        if (c->end) c->end(node);
+        if (c->end) c->end(node, c->data);
     }
 
     list_remove_item(node, runtimeData.renderers);
@@ -190,9 +190,20 @@ void set_scene(Node *root) {
 }
 
 void add_component(Node *node, Component *component) {
+    if (node->components == NULL) node->components = list_make();
     list_push_back(component, node->components);
     if (!node->active) return;
-    component->start(node);
+    component->start(node, component->data);
+}
+
+void add_child(Node *parent, Node *child) {
+    if (parent->children == NULL) parent->children = list_make();
+
+    list_push_back(child, parent->children);
+    if (!parent->active) return;
+    child->parent = parent;
+    node_added(child);
+    update_transform(child);
 }
 
 void update(Node *node) {
@@ -200,7 +211,7 @@ void update(Node *node) {
 
     FOREACH(comp, node->components) {
         Component *c = comp->data;
-        if (c->update) c->update(node, runtimeData.delta_time);
+        if (c->update) c->update(node, runtimeData.delta_time, c->data);
         if (node->transform.dirty) update_transform(node);
     }
 
